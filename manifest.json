@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "HildeSync",
+  "version": "1.0",
+  "description": "A simple Chrome extension that works only on a specific page.",
+  "permissions": ["scripting", "activeTab", "downloads"],
+  "host_permissions": [
+    "https://www.uni-hildesheim.de/learnweb2025/*",
+    "https://www.uni-hildesheim.de/learnweb2025/course/view.php?id=*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.uni-hildesheim.de/learnweb2025/course/view.php?id=*"],
+      "js": ["content.js"]
+    }
+  ]
+}
