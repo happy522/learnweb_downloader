@@ -14,56 +14,47 @@ function sanitizeFileName(name) {
     .replace(/\.+$/, "")
     .slice(0, 100);
 }
+
 function scrapeSections() {
-  return new Promise(resolve => {
-    const checkReady = () => {
-      const sections = document.querySelectorAll('.section.main.clearfix');
-      if (sections.length === 0) {
-        return setTimeout(checkReady, 300); // wait until DOM loads
-      }
+  const sections = [];
+  document.querySelectorAll('.section.main.clearfix').forEach(section => {
+    const titleEl = section.querySelector('.sectionname');
+    const sectionTitle = titleEl?.innerText?.trim() || "Untitled";
 
-      const result = [];
-      sections.forEach(section => {
-        const titleEl = section.querySelector('.sectionname');
-        const sectionTitle = titleEl?.innerText?.trim() || "Untitled";
+    const files = [];
+    section.querySelectorAll('li.modtype_resource').forEach((li) => {
+      const img = li.querySelector('img.activityicon');
+      const isFile = img && (
+        img.src.includes('/f/pdf') ||
+        img.src.includes('/f/text') ||
+        img.src.includes('/f/py')
+      );
 
-        const files = [];
-        section.querySelectorAll('li.modtype_resource').forEach((li) => {
-          const img = li.querySelector('img.activityicon');
-          const isFile = img && (
-            img.src.includes('/f/pdf') ||
-            img.src.includes('/f/text') ||
-            img.src.includes('/f/py')
-          );
-
-          if (isFile) {
-            const linkEl = li.querySelector('a.aalink');
-            const nameEl = li.querySelector('.instancename');
-            if (linkEl && nameEl) {
-              files.push({
-                title: nameEl.innerText.trim(),
-                url: linkEl.href
-              });
-            }
-          }
-        });
-
-        if (files.length > 0) {
-          result.push({ sectionTitle, files });
+      if (isFile) {
+        const linkEl = li.querySelector('a.aalink');
+        const nameEl = li.querySelector('.instancename');
+        if (linkEl && nameEl) {
+          files.push({
+            title: nameEl.innerText.trim(),
+            url: linkEl.href
+          });
         }
-      });
+      }
+    });
 
-      const subjectName = document.querySelector('title')?.innerText?.trim() || "Course";
-      resolve({ subjectName, sections: result });
-    };
-
-    checkReady();
+    if (files.length > 0) {
+      sections.push({ sectionTitle, files });
+    }
   });
+
+  const subjectName = document.querySelector('title')?.innerText?.trim() || "Course";
+  return { subjectName, sections };
 }
+
 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
   chrome.scripting.executeScript({
     target: { tabId: tabs[0].id },
-    func: scrapeSections
+    func: scrapeSections,
   }, (results) => {
     const result = results?.[0]?.result;
     if (!result) {
@@ -72,11 +63,9 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     }
 
     allData = result;
-    document.getElementById("courseTitle").textContent = allData.subjectName;
     renderSectionsWithFiles();
   });
 });
-
 function renderSectionsWithFiles() {
   sectionList.innerHTML = "";
 
@@ -147,6 +136,7 @@ function downloadFiles(files, subject, sectionName) {
     });
   });
 }
+
 downloadSelectedBtn.addEventListener("click", async () => {
   const selectedFiles = [];
 
@@ -168,30 +158,35 @@ downloadSelectedBtn.addEventListener("click", async () => {
     return;
   }
 
-  const zip = new JSZip();
+  status.textContent = "Preparing ZIP file...";
+
   const subject = sanitizeFileName(allData.subjectName);
-  status.textContent = "Fetching files...";
+  const zip = new JSZip();
 
   for (const file of selectedFiles) {
     try {
-      const response = await fetch(file.url, { credentials: 'include' });
+      const response = await fetch(file.url);
       const blob = await response.blob();
-      const ext = file.url.split('.').pop().split('?')[0];
       const safeTitle = sanitizeFileName(file.title);
-      const path = `${subject}/${file.sectionName}/${safeTitle}.${ext}`;
-      zip.file(path, blob);
-    } catch (err) {
-      console.error("Failed to fetch:", file.url, err);
+      const ext = file.url.split('.').pop().split('?')[0];
+      const filePath = `${file.sectionName}/${safeTitle}.${ext}`; // fixed template literal
+      zip.file(filePath, blob);
+    } catch (e) {
+      console.error(`Failed to fetch ${file.title}:`, e);
     }
   }
 
-  status.textContent = "Creating ZIP...";
-  zip.generateAsync({ type: "blob" }).then(blob => {
-    saveAs(blob, `${subject}.zip`);
-    status.textContent = `Downloaded ${subject}.zip`;
-  });
-});
+  const content = await zip.generateAsync({ type: "blob" });
+  const zipName = `${subject}.zip`; // fixed template literal
 
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(content);
+  link.download = zipName;
+  link.click();
+  URL.revokeObjectURL(link.href);
+
+  status.textContent = "ZIP file ready and downloaded!";
+});
 
 const selectAllCheckbox = document.getElementById("selectAllSections");
 
