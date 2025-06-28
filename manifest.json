@@ -5,8 +5,13 @@
   "description": "A simple Chrome extension that works only on a specific page.",
   "permissions": ["scripting", "activeTab", "downloads"],
   "host_permissions": [
-    "https://www.uni-hildesheim.de/learnweb2025/*",
-    "https://www.uni-hildesheim.de/learnweb2025/course/view.php?id=*"
+    "https://www.uni-hildesheim.de/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["jszip.min.js"],
+      "matches": ["https://www.uni-hildesheim.de/*"]
+    }
   ],
   "action": {
     "default_popup": "popup.html",
@@ -16,7 +21,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.uni-hildesheim.de/learnweb2025/course/view.php?id=*"],
+      "matches": ["https://www.uni-hildesheim.de/learnweb2025/course/view.php*"],
       "js": ["content.js"]
     }
   ]
